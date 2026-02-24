@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi Rastreador Pro</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body { margin: 0; font-family: sans-serif; }
+        #map { height: 100vh; width: 100%; }
+        .controls { position: absolute; top: 10px; left: 50px; z-index: 1000; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+    </style>
+</head>
+<body>
+
+    <div class="controls">
+        <button onclick="borrarHistorial()">Limpiar Ruta</button>
+    </div>
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, push, onValue, set } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+        // CONFIGURACIÓN DE TU FIREBASE (Pégala aquí)
+        // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyBPR2P8q6ofRb0ETtP6uR6_ZPjif97h6qQ",
+  authDomain: "mirastreador-659ab.firebaseapp.com",
+  databaseURL: "https://mirastreador-659ab-default-rtdb.firebaseio.com",
+  projectId: "mirastreador-659ab",
+  storageBucket: "mirastreador-659ab.firebasestorage.app",
+  messagingSenderId: "497445786440",
+  appId: "1:497445786440:web:7a4d2bc7b26485b5fc197d",
+  measurementId: "G-VBLDZSKJQK"
+};
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const rutaRef = ref(db, 'historial_ruta');
+
+        // 1. INICIALIZAR MAPA
+        const map = L.map('map').setView([0, 0], 2);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        
+        let marker = L.marker([0, 0]).addTo(map).bindPopup("¡Aquí estoy!");
+        let polyline = L.polyline([], {color: 'blue'}).addTo(map);
+
+        // 2. ENVIAR UBICACIÓN (Desde el móvil)
+        if ("geolocation" in navigator) {
+            navigator.geolocation.watchPosition((position) => {
+                const data = {
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude,
+                    timestamp: Date.now()
+                };
+                // 'push' guarda un nuevo punto sin borrar el anterior
+                push(rutaRef, data);
+            }, null, { enableHighAccuracy: true, distanceFilter: 10 });
+        }
+
+        // 3. LEER Y DIBUJAR (En tiempo real)
+        // 3. LEER Y DIBUJAR (En tiempo real)
+onValue(rutaRef, (snapshot) => {
+    const puntos = [];
+    snapshot.forEach((child) => {
+        const p = child.val();
+        puntos.push([p.lat, p.lng]);
+    });
+
+    if (puntos.length > 0) {
+        const ultimaPos = puntos[puntos.length - 1];
+        
+        // Actualiza la posición del marcador
+        marker.setLatLng(ultimaPos);
+        
+        // Dibuja la línea del recorrido
+        polyline.setLatLngs(puntos);
+        
+        // ESTO ES LO IMPORTANTE: Centra el mapa en TI con un zoom de 15
+        map.setView(ultimaPos, 15); 
+    }
+});
+
+        // Función para borrar (expuesta globalmente)
+        window.borrarHistorial = () => { if(confirm("¿Borrar ruta?")) set(rutaRef, null); };
+    </script>
+</body>
+</html>
